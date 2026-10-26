@@ -14,15 +14,15 @@
       {
         "label": "main",
         "title": "typer",
-        "width": 380,
-        "height": 300,
+        "width": 260,
+        "height": 200,
         "resizable": false,
         "decorations": false,
-        "alwaysOnTop": true,
         "skipTaskbar": true,
         "focus": true,
-        "center": false,
-        "transparent": true
+        "transparent": true,
+        "create": false,
+        "visible": false
       }
     ],
     "security": {

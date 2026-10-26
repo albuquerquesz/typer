@@ -27,6 +27,8 @@ const tauriBackend = {
   listPacks: () => invoke<PackInfo[]>("list_packs"),
   openPacksDir: () => invoke<void>("open_packs_dir"),
   close: () => invoke<void>("close"),
+  /** Shrink/grow the window to the menu's rendered height. */
+  fit: (height: number) => invoke<void>("fit", { height }),
   /** Enable close-on-blur once the user has reached the popup. */
   armAutoClose: () => invoke<void>("arm_autoclose"),
   /** `null` means the daemon went away. */
@@ -66,6 +68,7 @@ function mockBackend(): typeof tauriBackend {
     listPacks: () => Promise.resolve(packs),
     openPacksDir: () => Promise.resolve(),
     close: () => Promise.resolve(),
+    fit: () => Promise.resolve(),
     armAutoClose: () => Promise.resolve(),
     onState: () => Promise.resolve(() => {}),
   };
