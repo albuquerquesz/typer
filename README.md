@@ -21,7 +21,7 @@ bun install
 bun run install:local   # builds, copies binaries to ~/.local/bin, enables typerd.service
 ```
 
-typer shows up in Waybar's `tray` module on its own (no Waybar config needed). Right-click opens a small menu right below the icon (a layer-shell surface, so no window rules). `dist/hyprland.lua` only adds the `Super+Shift+T` on/off shortcut.
+typer shows up in Waybar's `tray` module on its own (no Waybar config needed). Right-click opens a small menu right below the icon (a layer-shell surface, so no window rules). `dist/hyprland.lua` adds the `Super+Shift+T` on/off shortcut and turns off Hyprland's layer animation for the menu (it animates itself).
 
 ## Use
 
