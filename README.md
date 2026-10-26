@@ -1,88 +1,51 @@
 # typer
 
-This project was created with [kubojs](https://github.com/albuquerquesz/kubo), a modern TypeScript stack that combines React, TanStack Router, and more.
+Mechanical keyboard sounds for Hyprland. Global capture via evdev, Mechvibes-compatible sound packs, and a Waybar module with a small control popup.
 
-## Features
+```
+crates/typer-core   shared config, Mechvibes manifest parsing, IPC protocol
+crates/typerd       daemon: evdev → realtime mixer (cpal); ~10 MB RSS
+crates/typerctl     CLI for Waybar, binds and scripts
+apps/web            Tauri + React popup (opens on demand, exits on blur)
+dist/               systemd unit, Waybar module, Hyprland (Lua) rules
+```
 
-- **TypeScript** - For type safety and improved developer experience
-- **TanStack Router** - File-based routing with full type safety
-- **TailwindCSS** - Utility-first CSS for rapid UI development
-- **Shared UI package** - shadcn/ui primitives live in `packages/ui`
-- **Turborepo** - Optimized monorepo build system
-- **Tauri** - Build native desktop applications
-- **Biome** - Linting and formatting
+Scaffolded with [kubojs](https://github.com/albuquerquesz/kubo).
 
-## Getting Started
+## Install
 
-First, install the dependencies:
+Requirements: Rust, Bun, WebKitGTK 4.1, ALSA/PipeWire, and your user in the `input` group.
 
-```bash
+```sh
 bun install
+bun run install:local   # builds, copies binaries to ~/.local/bin, enables typerd.service
 ```
 
+typer shows up in Waybar's `tray` module on its own (no Waybar config needed). Paste `dist/hyprland.lua` into your Hyprland config so the popup floats under the bar.
 
+## Use
 
+| Action                | Tray icon    | CLI                                    |
+| --------------------- | ------------ | -------------------------------------- |
+| Open / close the menu | right-click  | `typerctl popup`                       |
+| On / off              | left-click   | `typerctl toggle`, `Super+Shift+T`     |
+| Preview the sound     | middle-click | `typerctl preview`                     |
+| Volume                | scroll       | `typerctl volume 40` / `+5` / `-5`     |
+| Switch pack           | menu         | `typerctl packs`, `typerctl pack <id>` |
 
+Prefer a text module with the volume instead of an icon? `dist/waybar-module.jsonc` is an optional custom module with the same actions.
 
+## Sound packs
 
-Then, run the development server:
+Two synthesized packs are built in. To add a [Mechvibes](https://mechvibes.com) pack, copy its folder (the one with `config.json`) into `~/.local/share/typer/packs/` and run `typerctl reload`. Both `single` (sprite) and `multi` (file per key) packs are supported, with per-key sounds for Enter, Space, Backspace and so on.
 
-```bash
-bun run dev
+## Develop
+
+```sh
+bun run dev:daemon   # run typerd in the foreground
+bun run dev:popup    # tauri dev for the popup
+bun run test         # cargo tests
+bun run lint:rust && bun run check
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-
-## UI Customization
-
-React web apps in this stack share shadcn/ui primitives through `packages/ui`.
-
-- Change design tokens and global styles in `packages/ui/src/styles/globals.css`
-- Update shared primitives in `packages/ui/src/components/*`
-- Adjust shadcn aliases or style config in `packages/ui/components.json` and `apps/web/components.json`
-
-### Add more shared components
-
-Run this from the project root to add more primitives to the shared UI package:
-
-```bash
-npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
-```
-
-Import shared components like this:
-
-```tsx
-import { Button } from "@typer/ui/components/button"
-```
-
-### Add app-specific blocks
-
-If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
-
-
-
-## Git Hooks and Formatting
-
-- Run checks: `bun run check`
-
-
-
-## Project Structure
-
-```
-typer/
-├── apps/
-│   ├── web/         # Frontend application (React + TanStack Router)
-├── packages/
-│   ├── ui/          # Shared shadcn/ui components and styles
-```
-
-## Available Scripts
-
-- `bun run dev`: Start all applications in development mode
-- `bun run build`: Build all applications
-- `bun run dev:web`: Start only the web application
-- `bun run check-types`: Check TypeScript types across all apps
-- `bun run check`: Run Biome formatting and linting
-- `cd apps/web && bun run desktop:dev`: Start Tauri desktop app in development
-- `cd apps/web && bun run desktop:build`: Build Tauri desktop app
+`TYPER_SOCKET`, `XDG_CONFIG_HOME` and `XDG_DATA_HOME` let you run an isolated daemon next to the installed one.

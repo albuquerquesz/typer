@@ -1,0 +1,13 @@
+[Unit]
+Description=typer keyboard sound daemon
+PartOf=graphical-session.target
+After=graphical-session.target pipewire.service
+
+[Service]
+ExecStart=%h/.local/bin/typerd
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

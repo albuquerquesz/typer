@@ -27,7 +27,12 @@
     "build": "turbo run build",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",
-    "check": "biome check --write ."
+    "check": "biome check --write .",
+    "dev:popup": "cd apps/web && bun run desktop:dev",
+    "dev:daemon": "cargo run -p typerd",
+    "test": "cargo test --workspace",
+    "lint:rust": "cargo clippy --workspace -- -D warnings",
+    "install:local": "./scripts/install.sh"
   },
   "dependencies": {
     "dotenv": "catalog:",

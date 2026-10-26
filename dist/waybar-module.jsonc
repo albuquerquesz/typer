@@ -1,0 +1,19 @@
+// Optional: typer already shows an icon in Waybar's `tray` module.
+// Use this custom module only if you prefer a text indicator with the volume.
+// 1. Add "custom/typer" to modules-left / modules-center / modules-right.
+// 2. Paste this block into your Waybar config:
+"custom/typer": {
+  "exec": "typerctl status --follow --waybar",
+  "return-type": "json",
+  "format": "{}",
+  "tooltip": true,
+  "on-click": "typerctl popup",
+  "on-click-right": "typerctl toggle",
+  "on-click-middle": "typerctl preview",
+  "on-scroll-up": "typerctl volume +5",
+  "on-scroll-down": "typerctl volume -5"
+}
+
+// Optional style.css:
+// #custom-typer.off  { opacity: 0.5; }
+// #custom-typer.down { color: @warning_color; }

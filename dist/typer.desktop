@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Name=Typer
+Comment=Mechanical keyboard sounds: volume, pack and on/off
+Exec=typer
+Icon=input-keyboard
+Terminal=false
+Categories=Utility;
+Keywords=keyboard;sound;mechvibes;click;typing;
+StartupWMClass=typer
+Actions=toggle;preview;
+
+[Desktop Action toggle]
+Name=Toggle sound on/off
+Exec=typerctl toggle
+
+[Desktop Action preview]
+Name=Preview sound
+Exec=typerctl preview
