@@ -1,0 +1,12 @@
+[package]
+name = "typer-keys"
+description = "typer key overlay: shows pressed keys on screen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+typer-core.workspace = true
+gtk = "0.18"
+gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
+pangocairo = "0.18"
