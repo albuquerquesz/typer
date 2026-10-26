@@ -36,6 +36,6 @@ Packs: drop Mechvibes packs (folders with config.json) into
   ${XDG_DATA_HOME:-$HOME/.local/share}/typer/packs/  then run: typerctl reload
 
 The tray icon appears in Waybar's tray (right-click opens the menu).
-Hyprland rules -> $root/dist/hyprland.lua
+Hyprland shortcut -> $root/dist/hyprland.lua
 Optional Waybar text module -> $root/dist/waybar-module.jsonc
 EOF

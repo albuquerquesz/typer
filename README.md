@@ -6,8 +6,8 @@ Mechanical keyboard sounds for Hyprland. Global capture via evdev, Mechvibes-com
 crates/typer-core   shared config, Mechvibes manifest parsing, IPC protocol
 crates/typerd       daemon: evdev → realtime mixer (cpal); ~10 MB RSS
 crates/typerctl     CLI for Waybar, binds and scripts
-apps/web            Tauri + React popup (opens on demand, exits on blur)
-dist/               systemd unit, Waybar module, Hyprland (Lua) rules
+apps/web            Tauri + React menu (layer-shell, opens on demand, exits on blur)
+dist/               systemd unit, .desktop entry, Waybar module, Hyprland (Lua) shortcut
 ```
 
 Scaffolded with [kubojs](https://github.com/albuquerquesz/kubo).
@@ -21,7 +21,7 @@ bun install
 bun run install:local   # builds, copies binaries to ~/.local/bin, enables typerd.service
 ```
 
-typer shows up in Waybar's `tray` module on its own (no Waybar config needed). Paste `dist/hyprland.lua` into your Hyprland config so the popup floats under the bar.
+typer shows up in Waybar's `tray` module on its own (no Waybar config needed). Right-click opens a small menu right below the icon (a layer-shell surface, so no window rules). `dist/hyprland.lua` only adds the `Super+Shift+T` on/off shortcut.
 
 ## Use
 
