@@ -90,8 +90,8 @@ impl Item {
         detached(&self.daemon, |d| d.preview());
     }
 
-    fn context_menu(&self, _x: i32, _y: i32) {
-        if let Err(e) = typer_core::popup::toggle() {
+    fn context_menu(&self, x: i32, y: i32) {
+        if let Err(e) = typer_core::popup::toggle(Some((x, y))) {
             eprintln!("typerd: could not open popup: {e:#}");
         }
     }

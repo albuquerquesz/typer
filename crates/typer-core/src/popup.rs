@@ -4,9 +4,16 @@ use anyhow::Context;
 
 /// Open the control popup, or close it if it is already open: the popup app is
 /// single-instance and a second launch makes the running one exit.
-pub fn toggle() -> anyhow::Result<()> {
+///
+/// `at` is where the tray icon was clicked, in tray-host coordinates; the popup
+/// opens just below it.
+pub fn toggle(at: Option<(i32, i32)>) -> anyhow::Result<()> {
     let bin = std::env::var("TYPER_POPUP").unwrap_or_else(|_| "typer".into());
-    let mut child = Command::new(&bin)
+    let mut cmd = Command::new(&bin);
+    if let Some((x, y)) = at {
+        cmd.arg("--at").arg(format!("{x},{y}"));
+    }
+    let mut child = cmd
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

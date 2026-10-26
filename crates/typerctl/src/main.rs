@@ -71,7 +71,7 @@ fn main() -> anyhow::Result<()> {
         }
         Cmd::Preview => client::request(&Request::Preview).map(drop),
         Cmd::Reload => print_state(&client::request_state(&Request::Reload)?, false),
-        Cmd::Popup => typer_core::popup::toggle(),
+        Cmd::Popup => typer_core::popup::toggle(None),
     }
 }
 
