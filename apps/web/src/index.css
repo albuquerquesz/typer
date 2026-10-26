@@ -1,1 +1,7 @@
 @import "@typer/ui/globals.css";
+
+/* Transparent window so the popup's rounded corners show through. */
+html[data-tauri],
+html[data-tauri] body {
+  background: transparent;
+}

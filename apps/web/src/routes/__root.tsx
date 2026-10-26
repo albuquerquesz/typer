@@ -1,34 +1,12 @@
-import {
-  createRootRouteWithContext,
-  HeadContent,
-  Outlet,
-} from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { createRootRoute, HeadContent, Outlet } from "@tanstack/react-router";
 import { Toaster } from "@typer/ui/components/sonner";
-import Header from "@/components/header";
 import { ThemeProvider } from "@/components/theme-provider";
 import "../index.css";
 
-export type RouterAppContext = {};
-
-export const Route = createRootRouteWithContext<RouterAppContext>()({
+export const Route = createRootRoute({
   component: RootComponent,
   head: () => ({
-    meta: [
-      {
-        title: "typer",
-      },
-      {
-        name: "description",
-        content: "typer is a web application",
-      },
-    ],
-    links: [
-      {
-        rel: "icon",
-        href: "/favicon.ico",
-      },
-    ],
+    meta: [{ title: "typer" }],
   }),
 });
 
@@ -38,17 +16,13 @@ function RootComponent() {
       <HeadContent />
       <ThemeProvider
         attribute="class"
-        defaultTheme="dark"
+        defaultTheme="system"
+        enableSystem
         disableTransitionOnChange
-        storageKey="vite-ui-theme"
       >
-        <div className="grid h-svh grid-rows-[auto_1fr]">
-          <Header />
-          <Outlet />
-        </div>
-        <Toaster richColors />
+        <Outlet />
+        <Toaster richColors position="bottom-center" />
       </ThemeProvider>
-      <TanStackRouterDevtools position="bottom-left" />
     </>
   );
 }
