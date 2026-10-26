@@ -32,8 +32,20 @@ typer shows up in Waybar's `tray` module on its own (no Waybar config needed). R
 | Preview the sound     | middle-click | `typerctl preview`                     |
 | Volume                | scroll       | `typerctl volume 40` / `+5` / `-5`     |
 | Switch pack           | menu         | `typerctl packs`, `typerctl pack <id>` |
+| Key overlay on / off  | menu         | `typerctl keys on` / `off` / `toggle`  |
+| Move the key overlay  | menu         | `typerctl keys move`                   |
 
 Prefer a text module with the volume instead of an icon? `dist/waybar-module.jsonc` is an optional custom module with the same actions.
+
+## Key overlay
+
+"Mostrar teclas" in the menu shows the keys you press as plain text on screen (no background), with combos (`Ctrl + C`) and repeats (`A ×3`) collapsed. Each entry fades out after about two seconds.
+
+- **Rendering:** a small native GTK process, `typer-keys`, uses about 35 MB. `typerd` starts and stops it and restarts it if it crashes.
+- **Clicks:** the overlay is click-through.
+- **Moving it:** "Mover…" puts it in drag mode. Drag it, then release or press Enter to save the position, or press Esc to cancel. It stays inside its monitor; dragging it past the edge moves it to the next monitor, where you grab it again.
+
+Key labels are streamed over the user-only socket while the overlay runs, and are never written anywhere.
 
 ## Sound packs
 

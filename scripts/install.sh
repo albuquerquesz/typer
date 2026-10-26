@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build typer and install it for the current user:
-#   ~/.local/bin/{typerd,typerctl,typer}, a systemd --user service and a .desktop entry.
+#   ~/.local/bin/{typerd,typerctl,typer-keys,typer}, a systemd --user service and a .desktop entry.
 # Waybar and Hyprland configs are never touched; the snippets are printed instead.
 set -euo pipefail
 
@@ -15,11 +15,11 @@ if ! id -nG | grep -qw input; then
 fi
 
 cd "$root"
-cargo build --release -p typerd -p typerctl
+cargo build --release -p typerd -p typerctl -p typer-keys
 (cd apps/web && bun run desktop:build -- --no-bundle)
 
 mkdir -p "$apps"
-install -Dm755 target/release/typerd target/release/typerctl target/release/typer -t "$bin"
+install -Dm755 target/release/typerd target/release/typerctl target/release/typer-keys target/release/typer -t "$bin"
 install -Dm644 dist/typerd.service "$units/typerd.service"
 # Launcher entry (Vicinae, rofi, ...). Absolute paths: launchers may not have ~/.local/bin on PATH.
 sed -e "s|^Exec=typer\(ctl\)\?|Exec=$bin/typer\1|" dist/typer.desktop >"$apps/typer.desktop"
