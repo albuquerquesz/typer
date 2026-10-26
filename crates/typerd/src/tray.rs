@@ -4,8 +4,9 @@
 //! `ContextMenu` on right-click, which opens the typer popup.
 //!   left click → on/off · right click → popup · middle click → preview · scroll → volume
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use zbus::blocking::{Connection, connection, fdo::DBusProxy};
 use zbus::interface;
@@ -22,7 +23,13 @@ type ToolTip = (String, Vec<(i32, i32, Vec<u8>)>, String, String);
 
 struct Item {
     daemon: Arc<Daemon>,
+    /// Last menu toggle, to collapse repeated ContextMenu calls (see `context_menu`).
+    last_menu: Mutex<Option<Instant>>,
 }
+
+/// Waybar sends ContextMenu several times per right-click; since the popup
+/// toggles, an even count would open and close it in the same instant.
+const MENU_DEBOUNCE: Duration = Duration::from_millis(300);
 
 /// D-Bus handlers run on zbus' executor; anything that may emit signals back
 /// through the same connection must leave it first.
@@ -91,6 +98,11 @@ impl Item {
     }
 
     fn context_menu(&self, x: i32, y: i32) {
+        let mut last = self.last_menu.lock().unwrap();
+        if last.is_some_and(|t| t.elapsed() < MENU_DEBOUNCE) {
+            return;
+        }
+        *last = Some(Instant::now());
         if let Err(e) = typer_core::popup::toggle(Some((x, y))) {
             eprintln!("typerd: could not open popup: {e:#}");
         }
@@ -113,7 +125,7 @@ pub fn spawn(daemon: Arc<Daemon>) -> anyhow::Result<Connection> {
     let name = format!("org.kde.StatusNotifierItem-{}-1", std::process::id());
     let conn = connection::Builder::session()?
         .name(name.as_str())?
-        .serve_at(ITEM_PATH, Item { daemon })?
+        .serve_at(ITEM_PATH, Item { daemon, last_menu: Mutex::new(None) })?
         .build()?;
 
     register(&conn, &name);

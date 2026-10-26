@@ -16,7 +16,8 @@ pub fn toggle(at: Option<(i32, i32)>) -> anyhow::Result<()> {
     let mut child = cmd
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        // Inherited: under typerd this lands in the journal.
+        .stderr(Stdio::inherit())
         .spawn()
         .with_context(|| format!("launching {bin}"))?;
     // Reap it when it closes so a long-lived caller (typerd) doesn't collect zombies.
