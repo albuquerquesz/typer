@@ -113,7 +113,8 @@ fn watch_state(app: AppHandle) {
   });
 }
 
-/// `--at X,Y`: where the tray icon was clicked, passed on by typerd.
+/// `--at X,Y`: where the tray icon was clicked (global coordinates), passed on
+/// by typerd.
 fn click_position() -> Option<(i32, i32)> {
   let mut args = std::env::args().skip_while(|a| a != "--at").skip(1);
   let (x, y) = args.next()?.split_once(',').map(|(x, y)| (x.parse().ok(), y.parse().ok()))?;
@@ -170,7 +171,27 @@ mod menu {
     layer.set_anchor(Edge::Top, true);
     layer.set_anchor(Edge::Left, true);
     layer.set_layer_shell_margin(Edge::Top, GAP);
-    let left = at.map_or(GAP, |(x, _)| (x + NUDGE).max(0));
+    let left = match at {
+      // Tray hosts report the click in global layout coordinates: open on the
+      // monitor under it, offset from that monitor's left edge.
+      Some((x, y)) => {
+        let mut left = x;
+        if let Some(display) = gtk::gdk::Display::default() {
+          let monitor = (0..display.n_monitors())
+            .filter_map(|i| display.monitor(i))
+            .find(|m| {
+              let g = m.geometry();
+              (g.x()..g.x() + g.width()).contains(&x) && (g.y()..g.y() + g.height()).contains(&y)
+            });
+          if let Some(m) = monitor {
+            left -= m.geometry().x();
+            layer.set_monitor(&m);
+          }
+        }
+        (left + NUDGE).max(0)
+      }
+      None => GAP,
+    };
     layer.set_layer_shell_margin(Edge::Left, left);
     let (w, h) = window.inner_size().map_or((260, 200), |s| (s.width as i32, s.height as i32));
     layer.set_size_request(w, h);
