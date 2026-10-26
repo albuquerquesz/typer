@@ -8,7 +8,11 @@ use typer_core::client;
 use typer_core::{Request, Response, State};
 
 #[derive(Parser)]
-#[command(name = "typerctl", version, about = "Control the typer keyboard sound daemon")]
+#[command(
+    name = "typerctl",
+    version,
+    about = "Control the typer keyboard sound daemon"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Cmd,
@@ -44,15 +48,37 @@ enum Cmd {
     Reload,
     /// Open or close the control popup
     Popup,
+    /// Key overlay: `on`, `off`, `toggle` or `move` (drag it, then click to drop)
+    Keys { action: KeysAction },
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum KeysAction {
+    On,
+    Off,
+    Toggle,
+    Move,
 }
 
 fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
-        Cmd::Status { follow: false, waybar } => print_state(&client::request_state(&Request::Status)?, waybar),
-        Cmd::Status { follow: true, waybar } => follow(waybar),
+        Cmd::Status {
+            follow: false,
+            waybar,
+        } => print_state(&client::request_state(&Request::Status)?, waybar),
+        Cmd::Status {
+            follow: true,
+            waybar,
+        } => follow(waybar),
         Cmd::Toggle => print_state(&client::request_state(&Request::Toggle)?, false),
-        Cmd::On => print_state(&client::request_state(&Request::SetEnabled { enabled: true })?, false),
-        Cmd::Off => print_state(&client::request_state(&Request::SetEnabled { enabled: false })?, false),
+        Cmd::On => print_state(
+            &client::request_state(&Request::SetEnabled { enabled: true })?,
+            false,
+        ),
+        Cmd::Off => print_state(
+            &client::request_state(&Request::SetEnabled { enabled: false })?,
+            false,
+        ),
         Cmd::Volume { value } => {
             let req = parse_volume(&value)?;
             print_state(&client::request_state(&req)?, false)
@@ -62,7 +88,9 @@ fn main() -> anyhow::Result<()> {
             let Response::Packs { packs } = client::request(&Request::ListPacks)? else {
                 bail!("unexpected response from typerd");
             };
-            let active = client::request_state(&Request::Status).map(|s| s.pack).unwrap_or_default();
+            let active = client::request_state(&Request::Status)
+                .map(|s| s.pack)
+                .unwrap_or_default();
             for p in packs {
                 let mark = if p.id == active { "*" } else { " " };
                 println!("{mark} {:<28} {}", p.id, p.name);
@@ -72,15 +100,32 @@ fn main() -> anyhow::Result<()> {
         Cmd::Preview => client::request(&Request::Preview).map(drop),
         Cmd::Reload => print_state(&client::request_state(&Request::Reload)?, false),
         Cmd::Popup => typer_core::popup::toggle(None),
+        Cmd::Keys { action } => {
+            let req = match action {
+                KeysAction::On => Request::SetOverlay { enabled: true },
+                KeysAction::Off => Request::SetOverlay { enabled: false },
+                KeysAction::Toggle => {
+                    let on = client::request_state(&Request::Status)?.overlay;
+                    Request::SetOverlay { enabled: !on }
+                }
+                KeysAction::Move => Request::MoveOverlay { moving: true },
+            };
+            print_state(&client::request_state(&req)?, false)
+        }
     }
 }
 
 fn parse_volume(value: &str) -> anyhow::Result<Request> {
-    let n: i16 = value.trim_start_matches('+').parse().with_context(|| format!("invalid volume {value:?}"))?;
+    let n: i16 = value
+        .trim_start_matches('+')
+        .parse()
+        .with_context(|| format!("invalid volume {value:?}"))?;
     Ok(if value.starts_with(['+', '-']) {
         Request::AdjustVolume { delta: n }
     } else {
-        Request::SetVolume { volume: n.clamp(0, 100) as u8 }
+        Request::SetVolume {
+            volume: n.clamp(0, 100) as u8,
+        }
     })
 }
 
@@ -89,7 +134,11 @@ fn print_state(state: &State, waybar: bool) -> anyhow::Result<()> {
         println!("{}", waybar_json(Some(state)));
     } else {
         let onoff = if state.enabled { "on" } else { "off" };
-        println!("{onoff} · {}% · {} ({})", state.volume, state.pack_name, state.pack);
+        let keys = if state.overlay { " · keys on" } else { "" };
+        println!(
+            "{onoff} · {}% · {} ({}){keys}",
+            state.volume, state.pack_name, state.pack
+        );
     }
     Ok(())
 }
@@ -110,7 +159,9 @@ fn waybar_json(state: Option<&State>) -> serde_json::Value {
             "percentage": s.volume,
             "tooltip": format!("typer: off\nPack: {}", s.pack_name),
         }),
-        None => json!({ "text": "⌨ ‒", "alt": "down", "class": "down", "tooltip": "typerd is not running" }),
+        None => {
+            json!({ "text": "⌨ ‒", "alt": "down", "class": "down", "tooltip": "typerd is not running" })
+        }
     }
 }
 

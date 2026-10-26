@@ -1,13 +1,14 @@
 mod audio;
 mod icon;
 mod input;
+mod overlay;
 mod sounds;
 mod tray;
 
 use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -17,9 +18,11 @@ use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
 use typer_core::config::DEFAULT_PACK;
 use typer_core::keycodes::KEY_A;
+use typer_core::keys::{self, Modifiers};
 use typer_core::{Config, Request, Response, State, pack, paths};
 
 use crate::audio::Audio;
+use crate::overlay::Overlay;
 use crate::sounds::Sounds;
 
 struct Daemon {
@@ -32,6 +35,15 @@ struct Daemon {
     jitter: AtomicU32,
     /// Session bus connection of the tray icon, when a session bus exists.
     tray: OnceLock<zbus::blocking::Connection>,
+    overlay: Overlay,
+    /// The overlay is in drag-to-place mode (not persisted).
+    overlay_moving: AtomicBool,
+    /// Key-overlay streams; key labels are only built while one is connected.
+    key_subscribers: Mutex<Vec<UnixStream>>,
+    /// Held modifiers, and a modifier pressed with nothing else yet (so tapping
+    /// Super alone still shows up).
+    mods: AtomicU8,
+    lone_mod: AtomicU8,
 }
 
 impl Daemon {
@@ -43,6 +55,8 @@ impl Daemon {
             volume: config.volume,
             pack: sounds.id.clone(),
             pack_name: sounds.name.clone(),
+            overlay: config.overlay.enabled,
+            overlay_moving: self.overlay_moving.load(Ordering::Relaxed),
         }
     }
 
@@ -50,15 +64,45 @@ impl Daemon {
         self.enabled.load(Ordering::Relaxed)
     }
 
-    fn on_press(&self, code: u16) {
-        if !self.enabled() {
-            return;
+    fn on_key(&self, code: u16, pressed: bool) {
+        if pressed && self.enabled() {
+            self.play(code);
         }
-        self.play(code);
+        let streaming = !self.key_subscribers.lock().unwrap().is_empty();
+        match Modifiers::bit(code) {
+            Some(bit) if pressed => {
+                self.mods.fetch_or(bit, Ordering::Relaxed);
+                self.lone_mod.store(bit, Ordering::Relaxed);
+            }
+            Some(bit) => {
+                self.mods.fetch_and(!bit, Ordering::Relaxed);
+                if self.lone_mod.swap(0, Ordering::Relaxed) == bit && streaming {
+                    self.send_key(keys::modifier_label(bit).to_owned());
+                }
+            }
+            None if pressed => {
+                self.lone_mod.store(0, Ordering::Relaxed);
+                if streaming && let Some(label) = keys::label(code) {
+                    let mods = Modifiers(self.mods.load(Ordering::Relaxed));
+                    self.send_key(keys::combo(mods, label));
+                }
+            }
+            None => {}
+        }
+    }
+
+    fn send_key(&self, label: String) {
+        let line = encode(&Response::Key { label });
+        self.key_subscribers
+            .lock()
+            .unwrap()
+            .retain_mut(|s| s.write_all(&line).is_ok());
     }
 
     fn play(&self, code: u16) {
-        let Some(sample) = self.sounds.read().unwrap().for_key(code) else { return };
+        let Some(sample) = self.sounds.read().unwrap().for_key(code) else {
+            return;
+        };
         let j = self.jitter.fetch_add(0x9E37_79B9, Ordering::Relaxed);
         let gain = 0.9 + (j >> 24) as f32 / 255.0 * 0.2;
         self.audio.trigger(sample, gain);
@@ -72,6 +116,7 @@ impl Daemon {
             self.enabled.store(config.enabled, Ordering::Relaxed);
             self.audio.set_volume(config.volume);
             self.audio.set_playing(config.enabled);
+            self.overlay.set_enabled(config.overlay.enabled);
             if let Err(e) = config.save() {
                 eprintln!("typerd: could not save config: {e:#}");
             }
@@ -82,7 +127,10 @@ impl Daemon {
     fn broadcast(&self) -> State {
         let state = self.state();
         let line = encode(&Response::State(state.clone()));
-        self.subscribers.lock().unwrap().retain_mut(|s| s.write_all(&line).is_ok());
+        self.subscribers
+            .lock()
+            .unwrap()
+            .retain_mut(|s| s.write_all(&line).is_ok());
         if let Some(conn) = self.tray.get() {
             tray::notify(conn);
         }
@@ -123,16 +171,22 @@ impl Daemon {
         Some(match req {
             Request::Status => Response::State(self.state()),
             Request::Toggle => Response::State(self.update(|c| c.enabled = !c.enabled)),
-            Request::SetEnabled { enabled } => Response::State(self.update(|c| c.enabled = enabled)),
+            Request::SetEnabled { enabled } => {
+                Response::State(self.update(|c| c.enabled = enabled))
+            }
             Request::SetVolume { volume } => Response::State(self.update(|c| c.volume = volume)),
             Request::AdjustVolume { delta } => Response::State(self.update(|c| {
                 c.volume = (i16::from(c.volume) + delta).clamp(0, 100) as u8;
             })),
             Request::SetPack { id } => match self.set_pack(&id) {
                 Ok(state) => Response::State(state),
-                Err(e) => Response::Error { message: format!("{e:#}") },
+                Err(e) => Response::Error {
+                    message: format!("{e:#}"),
+                },
             },
-            Request::ListPacks => Response::Packs { packs: pack::list() },
+            Request::ListPacks => Response::Packs {
+                packs: pack::list(),
+            },
             Request::Preview => {
                 self.preview();
                 Response::State(self.state())
@@ -141,9 +195,31 @@ impl Daemon {
                 self.reload();
                 Response::State(self.state())
             }
+            Request::SetOverlay { enabled } => {
+                Response::State(self.update(|c| c.overlay.enabled = enabled))
+            }
+            Request::MoveOverlay { moving } => {
+                self.overlay_moving.store(moving, Ordering::Relaxed);
+                Response::State(self.broadcast())
+            }
+            Request::SetOverlayPosition { monitor, x, y } => {
+                self.overlay_moving.store(false, Ordering::Relaxed);
+                Response::State(self.update(|c| {
+                    c.overlay.monitor = monitor;
+                    c.overlay.x = x;
+                    c.overlay.y = y;
+                }))
+            }
+            Request::SubscribeKeys => {
+                let writer = stream.try_clone().ok()?;
+                self.key_subscribers.lock().unwrap().push(writer);
+                return None;
+            }
             Request::Subscribe => {
                 let mut writer = stream.try_clone().ok()?;
-                writer.write_all(&encode(&Response::State(self.state()))).ok()?;
+                writer
+                    .write_all(&encode(&Response::State(self.state())))
+                    .ok()?;
                 self.subscribers.lock().unwrap().push(writer);
                 return None;
             }
@@ -158,7 +234,9 @@ fn encode(res: &Response) -> Vec<u8> {
 }
 
 fn serve_client(daemon: &Arc<Daemon>, stream: UnixStream) {
-    let Ok(mut writer) = stream.try_clone() else { return };
+    let Ok(mut writer) = stream.try_clone() else {
+        return;
+    };
     for line in BufReader::new(&stream).lines() {
         let Ok(line) = line else { return };
         if line.trim().is_empty() {
@@ -166,12 +244,15 @@ fn serve_client(daemon: &Arc<Daemon>, stream: UnixStream) {
         }
         let response = match serde_json::from_str::<Request>(&line) {
             Ok(req) => daemon.handle(req, &stream),
-            Err(e) => Some(Response::Error { message: format!("bad request: {e}") }),
+            Err(e) => Some(Response::Error {
+                message: format!("bad request: {e}"),
+            }),
         };
         if let Some(res) = response
-            && writer.write_all(&encode(&res)).is_err() {
-                return;
-            }
+            && writer.write_all(&encode(&res)).is_err()
+        {
+            return;
+        }
     }
 }
 
@@ -202,20 +283,37 @@ fn run(listener: UnixListener) -> anyhow::Result<()> {
     let audio = Audio::start(config.volume, config.enabled).context("starting audio output")?;
 
     let sounds = Sounds::load(&config.pack, audio.sample_rate).or_else(|e| {
-        eprintln!("typerd: pack {} unavailable ({e:#}), using {DEFAULT_PACK}", config.pack);
+        eprintln!(
+            "typerd: pack {} unavailable ({e:#}), using {DEFAULT_PACK}",
+            config.pack
+        );
         Sounds::load(DEFAULT_PACK, audio.sample_rate)
     })?;
-    eprintln!("typerd: {} Hz output, pack {}", audio.sample_rate, sounds.id);
+    eprintln!(
+        "typerd: {} Hz output, pack {}",
+        audio.sample_rate, sounds.id
+    );
 
     let daemon = Arc::new(Daemon {
         enabled: AtomicBool::new(config.enabled),
-        config: Mutex::new(Config { pack: sounds.id.clone(), ..config }),
+        config: Mutex::new(Config {
+            pack: sounds.id.clone(),
+            ..config
+        }),
         sounds: RwLock::new(Arc::new(sounds)),
         audio,
         subscribers: Mutex::new(Vec::new()),
         jitter: AtomicU32::new(1),
         tray: OnceLock::new(),
+        overlay: Overlay::spawn(),
+        overlay_moving: AtomicBool::new(false),
+        key_subscribers: Mutex::new(Vec::new()),
+        mods: AtomicU8::new(0),
+        lone_mod: AtomicU8::new(0),
     });
+    daemon
+        .overlay
+        .set_enabled(daemon.config.lock().unwrap().overlay.enabled);
 
     match tray::spawn(daemon.clone()) {
         Ok(conn) => {
@@ -225,7 +323,7 @@ fn run(listener: UnixListener) -> anyhow::Result<()> {
     }
 
     let d = daemon.clone();
-    input::spawn(move |code| d.on_press(code)).context("watching /dev/input")?;
+    input::spawn(move |code, pressed| d.on_key(code, pressed)).context("watching /dev/input")?;
 
     let d = daemon.clone();
     let mut signals = Signals::new([SIGHUP, SIGINT, SIGTERM])?;
@@ -234,6 +332,7 @@ fn run(listener: UnixListener) -> anyhow::Result<()> {
             if sig == SIGHUP {
                 d.reload();
             } else {
+                d.overlay.set_enabled(false);
                 let _ = fs::remove_file(paths::socket());
                 std::process::exit(0);
             }
