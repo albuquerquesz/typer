@@ -103,6 +103,7 @@ impl Item {
             return;
         }
         *last = Some(Instant::now());
+        eprintln!("typerd: menu at {x},{y}");
         if let Err(e) = typer_core::popup::toggle(Some((x, y))) {
             eprintln!("typerd: could not open popup: {e:#}");
         }
