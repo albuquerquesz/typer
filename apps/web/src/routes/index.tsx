@@ -39,16 +39,11 @@ function Menu() {
     typer.listPacks().then(setPacks, () => {});
     const unlisten = typer.onState(apply);
 
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") typer.close();
-    };
-    window.addEventListener("keydown", onKey);
     window.addEventListener("pointermove", typer.armAutoClose, {
       once: true,
     });
     return () => {
       unlisten.then((fn) => fn());
-      window.removeEventListener("keydown", onKey);
       window.removeEventListener("pointermove", typer.armAutoClose);
     };
   }, []);
@@ -206,6 +201,10 @@ function Shell({
   children?: React.ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
+  // hidden until the content is laid out and the window fits it; then the
+  // window is mapped (`ready`) and the open animation starts.
+  const [phase, setPhase] = useState<"hidden" | "open" | "closing">("hidden");
+  const ready = children !== undefined;
 
   // The window has no fixed height: it follows the menu.
   useEffect(() => {
@@ -218,11 +217,51 @@ function Shell({
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const el = ref.current;
+    if (!ready || !el) return;
+    let frame = 0;
+    typer
+      .fit(el.getBoundingClientRect().height)
+      .then(typer.ready)
+      .finally(() => {
+        // Two frames: let GTK apply the new size before the first animated one.
+        frame = requestAnimationFrame(() => {
+          frame = requestAnimationFrame(() => setPhase("open"));
+        });
+      });
+    return () => cancelAnimationFrame(frame);
+  }, [ready]);
+
+  // Esc, clicking elsewhere and a second tray click all close with an animation.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const dismiss = () => {
+      setPhase("closing");
+      // Fallback for reduced motion, where no animationend fires.
+      timer = setTimeout(typer.close, 150);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") dismiss();
+    };
+    window.addEventListener("keydown", onKey);
+    const unlisten = typer.onDismiss(dismiss);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("keydown", onKey);
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
   const menu = (
     <main
       ref={ref}
+      data-phase={phase}
+      onAnimationEnd={() => {
+        if (phase === "closing") typer.close();
+      }}
       className={cn(
-        "border-border bg-background text-foreground w-[260px] rounded-lg border p-1 text-xs select-none",
+        "menu border-border bg-background text-foreground w-[260px] rounded-lg border p-1 text-xs select-none",
         !inTauri && "shadow-xl",
       )}
     >

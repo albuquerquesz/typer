@@ -27,10 +27,14 @@ const tauriBackend = {
   listPacks: () => invoke<PackInfo[]>("list_packs"),
   openPacksDir: () => invoke<void>("open_packs_dir"),
   close: () => invoke<void>("close"),
+  /** The menu is rendered and sized: map the window. */
+  ready: () => invoke<void>("ready"),
   /** Shrink/grow the window to the menu's rendered height. */
   fit: (height: number) => invoke<void>("fit", { height }),
   /** Enable close-on-blur once the user has reached the popup. */
   armAutoClose: () => invoke<void>("arm_autoclose"),
+  /** The popup should play its close animation and then `close()`. */
+  onDismiss: (cb: () => void) => listen("dismiss", () => cb()),
   /** `null` means the daemon went away. */
   onState: (cb: (state: TyperState | null) => void) =>
     listen<TyperState | null>("state-changed", (e) => cb(e.payload)),
@@ -69,8 +73,10 @@ function mockBackend(): typeof tauriBackend {
     openPacksDir: () => Promise.resolve(),
     close: () => Promise.resolve(),
     fit: () => Promise.resolve(),
+    ready: () => Promise.resolve(),
     armAutoClose: () => Promise.resolve(),
     onState: () => Promise.resolve(() => {}),
+    onDismiss: () => Promise.resolve(() => {}),
   };
 }
 

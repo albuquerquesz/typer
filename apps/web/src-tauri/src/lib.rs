@@ -95,9 +95,30 @@ fn fit(app: AppHandle, window: WebviewWindow, height: f64) -> CmdResult<()> {
   Ok(())
 }
 
+/// The UI is rendered and sized: show the window.
+#[tauri::command]
+fn ready(app: AppHandle) -> CmdResult<()> {
+  #[cfg(target_os = "linux")]
+  app.run_on_main_thread(menu::present).map_err(|e| e.to_string())?;
+  #[cfg(not(target_os = "linux"))]
+  let _ = app;
+  Ok(())
+}
+
 #[tauri::command]
 fn close(app: AppHandle) {
   app.exit(0);
+}
+
+/// Ask the UI to play its close animation and exit; it calls `close` when done.
+/// Exits anyway after a grace period in case the webview doesn't answer.
+fn dismiss(app: &AppHandle) {
+  let _ = app.emit("dismiss", ());
+  let app = app.clone();
+  thread::spawn(move || {
+    thread::sleep(Duration::from_millis(250));
+    app.exit(0);
+  });
 }
 
 /// Forward daemon state changes (from typerctl, binds, Waybar) to the UI.
@@ -199,9 +220,23 @@ mod menu {
       on_blur();
       gtk::glib::Propagation::Proceed
     });
-    layer.show_all();
+    // Mapped only once the UI is laid out (`present`, from the `ready`
+    // command): mapping right away flashes the webview's blank first frame.
+    // Fallback in case the page never says so.
     LAYER.with(|l| *l.borrow_mut() = Some(layer));
+    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(700), present);
     true
+  }
+
+  /// Map the menu. Must run on the GTK main thread.
+  pub fn present() {
+    LAYER.with(|l| {
+      if let Some(layer) = l.borrow().as_ref()
+        && !layer.is_visible()
+      {
+        layer.show_all();
+      }
+    });
   }
 
   /// Follow the menu's height. Must run on the GTK main thread. Returns false
@@ -227,7 +262,7 @@ pub fn run() {
   tauri::Builder::default()
     .manage(AutoClose(armed.clone()))
     // Launching again while open (tray click) closes the popup: a toggle.
-    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| app.exit(0)))
+    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| dismiss(app)))
     .invoke_handler(tauri::generate_handler![
       get_state,
       set_enabled,
@@ -238,6 +273,7 @@ pub fn run() {
       open_packs_dir,
       arm_autoclose,
       fit,
+      ready,
       close
     ])
     .setup(move |app| {
@@ -249,7 +285,7 @@ pub fn run() {
         let handle = app.handle().clone();
         let on_blur = move || {
           if armed.load(Ordering::Relaxed) {
-            handle.exit(0);
+            dismiss(&handle);
           }
         };
         if menu::show(&window, click_position(), on_blur) {
@@ -264,7 +300,7 @@ pub fn run() {
       if let WindowEvent::Focused(false) = event
         && close_on_blur.load(Ordering::Relaxed)
       {
-        window.app_handle().exit(0);
+        dismiss(window.app_handle());
       }
     })
     .run(tauri::generate_context!())
