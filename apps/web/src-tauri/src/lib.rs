@@ -47,6 +47,19 @@ fn preview() -> CmdResult<State> {
 }
 
 #[tauri::command]
+fn set_overlay(enabled: bool) -> CmdResult<State> {
+  state(Request::SetOverlay { enabled })
+}
+
+/// Drag mode for the key overlay; the menu closes so the overlay can be grabbed.
+#[tauri::command]
+fn move_overlay(app: AppHandle) -> CmdResult<State> {
+  let s = state(Request::MoveOverlay { moving: true })?;
+  dismiss(&app);
+  Ok(s)
+}
+
+#[tauri::command]
 fn list_packs() -> CmdResult<Vec<PackInfo>> {
   match client::request(&Request::ListPacks).map_err(|e| format!("{e:#}"))? {
     Response::Packs { packs } => Ok(packs),
@@ -269,6 +282,8 @@ pub fn run() {
       set_volume,
       set_pack,
       preview,
+      set_overlay,
+      move_overlay,
       list_packs,
       open_packs_dir,
       arm_autoclose,

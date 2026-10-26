@@ -6,6 +6,9 @@ export type TyperState = {
   volume: number;
   pack: string;
   pack_name: string;
+  /** Key overlay on screen. */
+  overlay: boolean;
+  overlay_moving: boolean;
 };
 
 export type PackInfo = {
@@ -24,6 +27,10 @@ const tauriBackend = {
   setVolume: (volume: number) => invoke<TyperState>("set_volume", { volume }),
   setPack: (id: string) => invoke<TyperState>("set_pack", { id }),
   preview: () => invoke<TyperState>("preview"),
+  setOverlay: (enabled: boolean) =>
+    invoke<TyperState>("set_overlay", { enabled }),
+  /** Put the overlay in drag mode; the menu closes so it can be reached. */
+  moveOverlay: () => invoke<TyperState>("move_overlay"),
   listPacks: () => invoke<PackInfo[]>("list_packs"),
   openPacksDir: () => invoke<void>("open_packs_dir"),
   close: () => invoke<void>("close"),
@@ -53,6 +60,8 @@ function mockBackend(): typeof tauriBackend {
     volume: 60,
     pack: packs[0].id,
     pack_name: packs[0].name,
+    overlay: false,
+    overlay_moving: false,
   };
   const update = (patch: Partial<TyperState>) => {
     state = { ...state, ...patch };
@@ -69,6 +78,8 @@ function mockBackend(): typeof tauriBackend {
         : Promise.reject(new Error(`unknown pack ${id}`));
     },
     preview: () => Promise.resolve(state),
+    setOverlay: (overlay) => update({ overlay }),
+    moveOverlay: () => Promise.resolve(state),
     listPacks: () => Promise.resolve(packs),
     openPacksDir: () => Promise.resolve(),
     close: () => Promise.resolve(),

@@ -4,6 +4,8 @@ import {
   Check,
   FolderOpen,
   Keyboard,
+  KeyRound,
+  Move,
   Play,
   Volume1,
   Volume2,
@@ -86,25 +88,12 @@ function Menu() {
   return (
     <Shell
       toggle={
-        <button
-          type="button"
-          role="switch"
-          aria-checked={state.enabled}
-          aria-label="Sons do teclado"
+        <Switch
+          checked={state.enabled}
+          label="Sons do teclado"
           title="Super + Shift + T"
-          onClick={() => run(typer.setEnabled(!state.enabled))}
-          className={cn(
-            "relative h-4 w-7 shrink-0 rounded-full transition-colors",
-            state.enabled ? "bg-primary" : "bg-muted-foreground/40",
-          )}
-        >
-          <span
-            className={cn(
-              "bg-background absolute top-0.5 left-0.5 size-3 rounded-full transition-transform",
-              state.enabled && "translate-x-3",
-            )}
-          />
-        </button>
+          onChange={(enabled) => run(typer.setEnabled(enabled))}
+        />
       }
     >
       <label
@@ -133,6 +122,23 @@ function Menu() {
           {volume}%
         </span>
       </label>
+
+      <Separator />
+
+      <Item
+        role="menuitemcheckbox"
+        aria-checked={state.overlay}
+        onClick={() => run(typer.setOverlay(!state.overlay))}
+      >
+        <KeyRound className="size-3.5 shrink-0" />
+        <span className="flex-1">Mostrar teclas</span>
+        <Switch checked={state.overlay} label="Mostrar teclas" />
+      </Item>
+      {state.overlay && (
+        <Item onClick={() => run(typer.moveOverlay())}>
+          <Move className="size-3.5 shrink-0" /> Mover…
+        </Item>
+      )}
 
       <Separator />
 
@@ -186,6 +192,52 @@ function Item({ className, ...props }: React.ComponentProps<"button">) {
       )}
       {...props}
     />
+  );
+}
+
+/** On/off pill. Without `onChange` it is display-only (its row handles clicks). */
+function Switch({
+  checked,
+  label,
+  title,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  title?: string;
+  onChange?: (checked: boolean) => void;
+}) {
+  const className = cn(
+    "relative h-4 w-7 shrink-0 rounded-full transition-colors",
+    checked ? "bg-primary" : "bg-muted-foreground/40",
+  );
+  const knob = (
+    <span
+      className={cn(
+        "bg-background absolute top-0.5 left-0.5 size-3 rounded-full transition-transform",
+        checked && "translate-x-3",
+      )}
+    />
+  );
+  if (!onChange) {
+    return (
+      <span aria-hidden className={className}>
+        {knob}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      title={title}
+      onClick={() => onChange(!checked)}
+      className={className}
+    >
+      {knob}
+    </button>
   );
 }
 
