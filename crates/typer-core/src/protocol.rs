@@ -1,6 +1,7 @@
 //! Line-delimited JSON protocol spoken over `$XDG_RUNTIME_DIR/typer.sock`.
 //! Each request is one JSON object per line and gets exactly one response line,
-//! except `subscribe`, which keeps the connection open and streams `state` lines.
+//! except `subscribe` and `subscribe_keys`, which keep the connection open and
+//! stream `state` / `key` lines.
 
 use serde::{Deserialize, Serialize};
 
@@ -9,16 +10,40 @@ use serde::{Deserialize, Serialize};
 pub enum Request {
     Status,
     Toggle,
-    SetEnabled { enabled: bool },
-    SetVolume { volume: u8 },
-    AdjustVolume { delta: i16 },
-    SetPack { id: String },
+    SetEnabled {
+        enabled: bool,
+    },
+    SetVolume {
+        volume: u8,
+    },
+    AdjustVolume {
+        delta: i16,
+    },
+    SetPack {
+        id: String,
+    },
     ListPacks,
     /// Play a sample key from the active pack.
     Preview,
     /// Rescan pack directories and reload the active pack.
     Reload,
     Subscribe,
+    /// Turn the key overlay on or off.
+    SetOverlay {
+        enabled: bool,
+    },
+    /// Enter or leave the overlay's drag-to-place mode.
+    MoveOverlay {
+        moving: bool,
+    },
+    /// Save where the overlay was dropped; also leaves move mode.
+    SetOverlayPosition {
+        monitor: Option<String>,
+        x: i32,
+        y: i32,
+    },
+    /// Stream pressed keys as labels, for the overlay. Nothing is stored.
+    SubscribeKeys,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -26,6 +51,7 @@ pub enum Request {
 pub enum Response {
     State(State),
     Packs { packs: Vec<PackInfo> },
+    Key { label: String },
     Error { message: String },
 }
 
@@ -35,6 +61,10 @@ pub struct State {
     pub volume: u8,
     pub pack: String,
     pub pack_name: String,
+    #[serde(default)]
+    pub overlay: bool,
+    #[serde(default)]
+    pub overlay_moving: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

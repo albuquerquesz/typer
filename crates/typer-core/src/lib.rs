@@ -3,10 +3,11 @@
 pub mod client;
 pub mod config;
 pub mod keycodes;
+pub mod keys;
 pub mod pack;
 pub mod paths;
 pub mod popup;
 pub mod protocol;
 
-pub use config::Config;
+pub use config::{Config, OverlayConfig};
 pub use protocol::{PackInfo, Request, Response, State};

@@ -55,3 +55,15 @@ pub fn subscribe(mut on_state: impl FnMut(State)) -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+/// Stream pressed-key labels until the connection drops.
+pub fn subscribe_keys(mut on_key: impl FnMut(String)) -> anyhow::Result<()> {
+    let mut stream = connect()?;
+    send(&mut stream, &Request::SubscribeKeys)?;
+    for line in BufReader::new(stream).lines() {
+        if let Response::Key { label } = serde_json::from_str(&line?)? {
+            on_key(label);
+        }
+    }
+    Ok(())
+}

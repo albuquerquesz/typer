@@ -14,11 +14,41 @@ pub struct Config {
     /// 0..=100
     pub volume: u8,
     pub pack: String,
+    pub overlay: OverlayConfig,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { enabled: true, volume: 60, pack: DEFAULT_PACK.to_owned() }
+        Self {
+            enabled: true,
+            volume: 60,
+            pack: DEFAULT_PACK.to_owned(),
+            overlay: OverlayConfig::default(),
+        }
+    }
+}
+
+/// Key overlay: whether it runs and where it sits.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OverlayConfig {
+    pub enabled: bool,
+    /// Monitor (connector) it was placed on; `None` lets the compositor pick.
+    pub monitor: Option<String>,
+    /// Offset from the monitor's top-left corner; negative means "not placed
+    /// yet" and the overlay picks bottom-center.
+    pub x: i32,
+    pub y: i32,
+}
+
+impl Default for OverlayConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            monitor: None,
+            x: -1,
+            y: -1,
+        }
     }
 }
 
