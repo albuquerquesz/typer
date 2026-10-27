@@ -18,7 +18,7 @@ use typer_core::{Config, OverlayConfig, Request, client};
 
 use crate::history::History;
 
-const WIDTH: i32 = 720;
+const WIDTH: i32 = 480;
 const HEIGHT: i32 = 64;
 const FONT: &str = "Sans Bold 20";
 const GAP: f64 = 18.0;
@@ -311,12 +311,7 @@ impl Overlay {
 
         if self.moving.get() {
             draw_move_frame(cr);
-            draw_text(
-                cr,
-                "Arraste para posicionar · Enter salva · Esc cancela",
-                PAD,
-                1.0,
-            );
+            draw_text(cr, "Arraste · Enter salva · Esc cancela", PAD, 1.0);
             return;
         }
 
