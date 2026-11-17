@@ -42,6 +42,8 @@ pub enum Request {
         x: i32,
         y: i32,
     },
+    /// Shut the daemon down; it replies with the last state before exiting.
+    Quit,
     /// Stream pressed keys as labels, for the overlay. Nothing is stored.
     SubscribeKeys,
 }

@@ -167,6 +167,16 @@ impl Daemon {
         }
     }
 
+    /// Hide the overlay, drop the socket and exit. Exit code 0, so systemd's
+    /// `Restart=on-failure` leaves it stopped.
+    fn shutdown(&self) -> ! {
+        self.overlay.set_enabled(false);
+        let _ = fs::remove_file(paths::socket());
+        // Give the overlay thread a moment to kill typer-keys.
+        thread::sleep(Duration::from_millis(100));
+        std::process::exit(0);
+    }
+
     fn handle(self: &Arc<Self>, req: Request, stream: &UnixStream) -> Option<Response> {
         Some(match req {
             Request::Status => Response::State(self.state()),
@@ -210,6 +220,12 @@ impl Daemon {
                     c.overlay.y = y;
                 }))
             }
+            Request::Quit => {
+                eprintln!("typerd: quit requested");
+                // Exit after the reply has gone out.
+                detached_quit(self.clone());
+                Response::State(self.state())
+            }
             Request::SubscribeKeys => {
                 let writer = stream.try_clone().ok()?;
                 self.key_subscribers.lock().unwrap().push(writer);
@@ -225,6 +241,13 @@ impl Daemon {
             }
         })
     }
+}
+
+fn detached_quit(daemon: Arc<Daemon>) {
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(50));
+        daemon.shutdown();
+    });
 }
 
 fn encode(res: &Response) -> Vec<u8> {
@@ -332,9 +355,7 @@ fn run(listener: UnixListener) -> anyhow::Result<()> {
             if sig == SIGHUP {
                 d.reload();
             } else {
-                d.overlay.set_enabled(false);
-                let _ = fs::remove_file(paths::socket());
-                std::process::exit(0);
+                d.shutdown();
             }
         }
     });

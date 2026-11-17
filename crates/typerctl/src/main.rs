@@ -46,6 +46,8 @@ enum Cmd {
     Preview,
     /// Rescan packs and reload the active one
     Reload,
+    /// Stop the daemon (sound, tray icon and overlay)
+    Quit,
     /// Open or close the control popup
     Popup,
     /// Key overlay: `on`, `off`, `toggle` or `move` (drag it, then click to drop)
@@ -99,6 +101,7 @@ fn main() -> anyhow::Result<()> {
         }
         Cmd::Preview => client::request(&Request::Preview).map(drop),
         Cmd::Reload => print_state(&client::request_state(&Request::Reload)?, false),
+        Cmd::Quit => client::request(&Request::Quit).map(drop),
         Cmd::Popup => typer_core::popup::toggle(None),
         Cmd::Keys { action } => {
             let req = match action {

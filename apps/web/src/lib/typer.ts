@@ -31,6 +31,8 @@ const tauriBackend = {
     invoke<TyperState>("set_overlay", { enabled }),
   /** Put the overlay in drag mode; the menu closes so it can be reached. */
   moveOverlay: () => invoke<TyperState>("move_overlay"),
+  /** Stop typerd entirely (sound, tray icon, overlay) and close the menu. */
+  quitDaemon: () => invoke<void>("quit_daemon"),
   listPacks: () => invoke<PackInfo[]>("list_packs"),
   openPacksDir: () => invoke<void>("open_packs_dir"),
   close: () => invoke<void>("close"),
@@ -80,6 +82,7 @@ function mockBackend(): typeof tauriBackend {
     preview: () => Promise.resolve(state),
     setOverlay: (overlay) => update({ overlay }),
     moveOverlay: () => Promise.resolve(state),
+    quitDaemon: () => Promise.resolve(),
     listPacks: () => Promise.resolve(packs),
     openPacksDir: () => Promise.resolve(),
     close: () => Promise.resolve(),

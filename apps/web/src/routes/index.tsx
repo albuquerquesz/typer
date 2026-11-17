@@ -7,6 +7,7 @@ import {
   KeyRound,
   Move,
   Play,
+  Power,
   Volume1,
   Volume2,
   VolumeX,
@@ -171,6 +172,16 @@ function Menu() {
         onClick={() => run(typer.openPacksDir())}
       >
         <FolderOpen className="size-3.5 shrink-0" /> Abrir pasta de packs
+      </Item>
+
+      <Separator />
+
+      <Item
+        title="Para o typerd: sons, ícone na barra e teclas na tela"
+        className="hover:text-destructive"
+        onClick={() => run(typer.quitDaemon())}
+      >
+        <Power className="size-3.5 shrink-0" /> Encerrar typer
       </Item>
 
       {error && (

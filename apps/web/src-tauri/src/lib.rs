@@ -59,6 +59,14 @@ fn move_overlay(app: AppHandle) -> CmdResult<State> {
   Ok(s)
 }
 
+/// Stop typerd (sound, tray icon and overlay) and close the menu.
+#[tauri::command]
+fn quit_daemon(app: AppHandle) -> CmdResult<()> {
+  client::request(&Request::Quit).map_err(|e| format!("{e:#}"))?;
+  dismiss(&app);
+  Ok(())
+}
+
 #[tauri::command]
 fn list_packs() -> CmdResult<Vec<PackInfo>> {
   match client::request(&Request::ListPacks).map_err(|e| format!("{e:#}"))? {
@@ -283,6 +291,7 @@ pub fn run() {
       set_pack,
       preview,
       set_overlay,
+      quit_daemon,
       move_overlay,
       list_packs,
       open_packs_dir,
